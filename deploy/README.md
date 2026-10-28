@@ -35,6 +35,9 @@ sudo netfilter-persistent save
 
 Si aparece **"Out of capacity"** para Ampere, probá otro availability domain o esperá; el micro AMD siempre suele estar disponible, pero es más lento.
 
+> **Ojo con Always Free:** OCI puede reclamar instancias ociosas (CPU, red y memoria bajas durante 7 días).
+> Este bot consume poco CPU, así que para 24/7 estable conviene un VPS pago; Oracle sirve bien para probar.
+
 ## Opción B: cualquier VPS (Hostinger VPS, Hetzner, DigitalOcean)
 
 Crear una instancia Ubuntu 24.04 con 1 vCPU / 1 GB, IP pública y clave SSH. Abrir 22/80/443:
