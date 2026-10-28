@@ -1,0 +1,76 @@
+# ============================================================
+#  QuantFlow - configuración
+# ============================================================
+
+exchange:
+  market: futures          # futures (Binance USDⓈ-M perpetuos) | spot
+
+symbols: [BTCUSDT, ETHUSDT]
+
+# Duración de cada barra footprint. Con comisiones taker (~0.1% ida y vuelta),
+# en barras de 1 minuto el stop típico es menor que el coste de la operación;
+# 5 minutos da stops lo bastante amplios para que la ventaja no se la coman los costes.
+bar_seconds: 300
+warmup_minutes: 120        # historial de ticks que se descarga al arrancar
+warmup_bars: 20            # barras mínimas antes de evaluar entradas
+
+footprint:
+  # Tamaño de cada nivel de precio del footprint. Si un símbolo no aparece
+  # se calcula automáticamente (~1 punto básico del precio).
+  bucket: {BTCUSDT: 10, ETHUSDT: 0.5}
+  imbalance_ratio: 3.0     # ask(p) >= 3 x bid(p-1)  -> imbalance comprador
+  stacked_min: 3           # niveles consecutivos para "imbalance apilado"
+  min_level_frac: 0.5      # volumen mínimo del nivel (fracción del promedio por nivel)
+
+profile:
+  lookback_bars: 96        # perfil de volumen móvil (96 x 5m = 8h)
+  value_area: 0.70
+
+quant:
+  atr_period: 14
+  hurst_window: 120
+
+decision:
+  setups: [absorcion, imbalance_apilado, divergencia_cvd]
+  min_probability: 0.55
+  min_expected_value_r: 0.15   # esperanza mínima en múltiplos de R, ya neta de comisiones
+  min_rr: 1.5
+  continuation_rr: 2.0
+  stop_atr_buffer: 0.25        # colchón del stop más allá de la estructura (en ATR)
+  max_stop_atr: 2.5            # descarta stops más amplios que esto
+  max_cost_r: 0.35             # descarta si comisiones + slippage superan esta fracción del riesgo
+  absorption_min_delta: 0.15   # |delta|/volumen mínimo para considerar absorción
+  divergence_lookback: 12
+  require_tradingview: false   # true = solo entra si una alerta de TradingView confirma
+  tradingview_ttl_seconds: 900
+  calibration_prior_strength: 30
+  # Pesos del modelo logístico (cada factor va de -1 a +1 a favor del trade)
+  weights:
+    bias: -0.30
+    orderflow: 1.00
+    delta: 0.50
+    location: 0.60
+    regime: 0.40
+    book: 0.40
+    tradingview: 0.50
+
+risk:
+  starting_equity: 10000
+  risk_per_trade_pct: 0.5
+  max_leverage: 5
+  max_daily_loss_pct: 2.0
+  fee_pct_per_side: 0.05       # comisión taker de Binance Futures
+  slippage_pct: 0.01
+  cooldown_bars: 2
+  breakeven_at_r: 1.0          # mueve el stop a entrada al alcanzar +1R (0 = desactivado)
+  max_bars_in_trade: 24
+  orderflow_exit_delta: 0.25   # cierra si aparece imbalance apilado en contra con este delta
+
+server:
+  host: 127.0.0.1
+  port: 8000
+  webhook_passphrase: "cambia-esto"
+
+storage:
+  db_path: data/quantflow.db
+  cache_dir: data/cache

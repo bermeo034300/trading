@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuantFlow</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #161b22; --line: #262d36; --text: #d7dde4; --muted: #8a94a1;
+    --buy: #2fbf8f; --sell: #e5575b; --accent: #5b9cf5; --warn: #e3b341;
+    --buy-bg: 47, 191, 143; --sell-bg: 229, 87, 91;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f5f6f8; --panel: #ffffff; --line: #e1e4e8; --text: #1d232b; --muted: #5f6b7a;
+      --buy: #138a63; --sell: #c93c40; --accent: #2a6fd6; --warn: #a66d00;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+           border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  h1 { font-size: 16px; margin: 0; letter-spacing: .3px; }
+  .tabs button { background: none; border: 1px solid var(--line); color: var(--muted);
+                 padding: 4px 12px; border-radius: 6px; cursor: pointer; font: inherit; }
+  .tabs button.on { color: var(--text); border-color: var(--accent); }
+  .pill { padding: 2px 10px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); }
+  .spacer { flex: 1; }
+  main { padding: 16px 20px; display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .kpi { padding: 10px 12px; }
+  .kpi .l { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+  .kpi .v { font-size: 17px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .kpi .s { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } }
+  .card { padding: 12px 14px; min-width: 0; }
+  .card h2 { font-size: 12px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 3px 6px; text-align: right; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; border-bottom: 1px solid var(--line); }
+  td:first-child, th:first-child { text-align: left; }
+  .scroll { overflow: auto; }
+  .fp td { padding: 1px 6px; font-size: 12px; }
+  .fp td.cell { text-align: center; min-width: 108px; border-left: 1px solid var(--line); }
+  .fp .b, .fp .a { display: inline-block; min-width: 46px; padding: 0 3px; border-radius: 3px; }
+  .fp .b { text-align: right; } .fp .a { text-align: left; }
+  .fp .imb-b { color: var(--sell); font-weight: 700; outline: 1px solid var(--sell); }
+  .fp .imb-a { color: var(--buy); font-weight: 700; outline: 1px solid var(--buy); }
+  .fp .poc { box-shadow: inset 0 0 0 1px var(--warn); }
+  .fp tr.px td.price { color: var(--accent); font-weight: 700; }
+  .fp tfoot td { border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; text-align: center; }
+  .buy { color: var(--buy); } .sell { color: var(--sell); } .muted { color: var(--muted); }
+  .sig { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+  .sig.ok { border-color: var(--accent); }
+  .sig .top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .sig ul { margin: 4px 0 0; padding-left: 16px; color: var(--muted); }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  .empty { color: var(--muted); padding: 12px 0; }
+  canvas { width: 100%; height: 120px; display: block; }
+  .feat { display: inline-block; margin-right: 8px; font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>QuantFlow</h1>
+  <div class="tabs" id="tabs"></div>
+  <span class="pill" id="status">conectando…</span>
+  <div class="spacer"></div>
+  <span class="muted">Paper trading · no es asesoría financiera</span>
+</header>
+<main>
+  <section class="kpis" id="kpis"></section>
+  <section class="grid2">
+    <div class="card">
+      <h2>Footprint (bid × ask por nivel) · últimas barras</h2>
+      <div class="scroll" id="footprint"></div>
+    </div>
+    <div style="display:grid; gap:16px; align-content:start; min-width:0">
+      <div class="card"><h2>Posición abierta</h2><div id="position"></div></div>
+      <div class="card"><h2>Señales recientes</h2><div id="signals"></div></div>
+    </div>
+  </section>
+  <section class="grid2">
+    <div class="card"><h2>Operaciones cerradas</h2><div class="scroll" id="trades"></div></div>
+    <div class="card"><h2>Rendimiento</h2><div id="stats"></div><canvas id="equity"></canvas></div>
+  </section>
+</main>
+<script>
+let current = null, last = null;
+const $ = (id) => document.getElementById(id);
+const n = (v, d = 2) => v == null ? "–" : Number(v).toLocaleString("es", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (v) => v == null ? "–" : (v * 100).toFixed(1) + "%";
+const r = (v) => v == null ? "–" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R";
+const t = (ms) => new Date(ms).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const sideCls = (s) => s === "long" ? "buy" : "sell";
+const sideTxt = (s) => s === "long" ? "LARGO" : "CORTO";
+const vol = (v) => v >= 1000 ? (v / 1000).toFixed(1) + "k" : v >= 10 ? v.toFixed(0) : v.toFixed(2);
+
+function kpis(s) {
+  const c = s.context || {}, bk = s.book || {}, tv = s.tradingview;
+  const dec = s.bucket < 1 ? 4 : 2;
+  const items = [
+    ["Precio", n(s.price, dec), `${s.bars_closed} barras cerradas`],
+    ["VWAP", n(c.vwap, dec), c.vwap_std ? `σ ${n(c.vwap_std, dec)}` : ""],
+    ["POC", n(c.poc, dec), `VAH ${n(c.vah, dec)} · VAL ${n(c.val, dec)}`],
+    ["ATR", n(c.atr, dec), "volatilidad por barra"],
+    ["Régimen", c.regime || "–", c.hurst != null ? `Hurst ${c.hurst.toFixed(2)}` : ""],
+    ["CVD", n(c.cvd, 1), "delta acumulado"],
+    ["Libro L2", bk.imbalance == null ? "–" : pct(bk.imbalance), bk.imbalance > 0 ? "más bids" : bk.imbalance < 0 ? "más asks" : ""],
+    ["TradingView", tv ? `<span class="${sideCls(tv.side)}">${tv.side}</span>` : "–", tv ? `${tv.setup} · ${t(tv.ts)}` : "sin alertas"],
+  ];
+  $("kpis").innerHTML = items.map(([l, v, sub]) =>
+    `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join("");
+}
+
+function footprint(s) {
+  const bars = [...(s.recent_bars || []), ...(s.current_bar ? [s.current_bar] : [])];
+  if (!bars.length) { $("footprint").innerHTML = '<div class="empty">Esperando ticks…</div>'; return; }
+  const bucket = bars[0].bucket, dec = bucket < 1 ? 4 : 2;
+  const key = (p) => Math.round(p / bucket);
+  const maps = bars.map((b) => new Map(b.levels.map((l) => [key(l.price), l])));
+  let keys = [...new Set(maps.flatMap((m) => [...m.keys()]))].sort((a, b) => b - a);
+  const pk = key(Math.floor(s.price / bucket) * bucket);
+  if (keys.length > 36) keys = keys.sort((a, b) => Math.abs(a - pk) - Math.abs(b - pk)).slice(0, 36).sort((a, b) => b - a);
+  const maxV = Math.max(1e-9, ...bars.flatMap((b) => b.levels.map((l) => Math.max(l.bid, l.ask))));
+  const head = bars.map((b, i) => `<th style="text-align:center">${t(b.start)}${i === bars.length - 1 && s.current_bar ? " ●" : ""}</th>`).join("");
+  const rows = keys.map((k) => {
+    const cells = maps.map((m) => {
+      const l = m.get(k);
+      if (!l) return '<td class="cell"></td>';
+      const bb = `rgba(var(--sell-bg), ${(l.bid / maxV * .55).toFixed(2)})`;
+      const ab = `rgba(var(--buy-bg), ${(l.ask / maxV * .55).toFixed(2)})`;
+      return `<td class="cell ${l.poc ? "poc" : ""}"><span class="b ${l.sell_imb ? "imb-b" : ""}" style="background:${bb}">${vol(l.bid)}</span> × <span class="a ${l.buy_imb ? "imb-a" : ""}" style="background:${ab}">${vol(l.ask)}</span></td>`;
+    }).join("");
+    return `<tr class="${k === pk ? "px" : ""}"><td class="price">${n(k * bucket, dec)}</td>${cells}</tr>`;
+  }).join("");
+  const foot = bars.map((b) => `<td class="${b.delta >= 0 ? "buy" : "sell"}">Δ ${(b.delta >= 0 ? "+" : "-") + vol(Math.abs(b.delta))}<br><span class="muted">vol ${vol(b.volume)}</span></td>`).join("");
+  $("footprint").innerHTML = `<table class="fp"><thead><tr><th>Precio</th>${head}</tr></thead><tbody>${rows}</tbody><tfoot><tr><td></td>${foot}</tr></tfoot></table>`;
+}
+
+function position(s) {
+  const p = s.position;
+  if (!p) { $("position").innerHTML = '<div class="empty">Sin posición. El motor espera una señal con probabilidad y esperanza suficientes.</div>'; return; }
+  const dec = s.bucket < 1 ? 4 : 2;
+  $("position").innerHTML = `
+    <div class="top"><b class="${p.side === "long" ? "buy" : "sell"}">${sideTxt(p.side)}</b> · ${p.setup} · ${n(p.qty, 4)} uds · abierta ${t(p.opened_ts)}</div>
+    <table><tr><th>Entrada</th><th>Stop</th><th>Objetivo</th><th>P. actual</th><th>P&L</th></tr>
+    <tr><td>${n(p.entry, dec)}</td><td>${n(p.stop, dec)}${p.breakeven ? " (BE)" : ""}</td><td>${n(p.target, dec)}</td><td>${n(p.price, dec)}</td>
+    <td class="${p.unrealized >= 0 ? "buy" : "sell"}">${n(p.unrealized)} (${r(p.unrealized_r)})</td></tr></table>`;
+}
+
+function signals(s) {
+  const list = s.signals || [];
+  if (!list.length) { $("signals").innerHTML = '<div class="empty">Aún no hay setups evaluados.</div>'; return; }
+  const dec = s.bucket < 1 ? 4 : 2;
+  $("signals").innerHTML = list.slice(0, 8).map((g) => `
+    <div class="sig ${g.accepted ? "ok" : ""}">
+      <div class="top"><b class="${sideCls(g.side)}">${sideTxt(g.side)}</b><span>${g.setup}</span>
+        <span class="muted">${t(g.ts)}</span><span class="spacer"></span>
+        <span>${g.accepted ? "✓ aceptada" : '<span class="muted">descartada</span>'}</span></div>
+      <div>P ${pct(g.probability)} · EV ${r(g.expected_value_r)} · R:R ${g.rr.toFixed(2)} · E ${n(g.entry, dec)} · SL ${n(g.stop, dec)} · TP ${n(g.target, dec)}</div>
+      <div class="bar"><i style="width:${(g.probability * 100).toFixed(0)}%"></i></div>
+      <div>${Object.entries(g.features).map(([k, v]) => `<span class="feat ${v > 0 ? "buy" : v < 0 ? "sell" : "muted"}">${k} ${v > 0 ? "+" : ""}${v.toFixed(2)}</span>`).join("")}</div>
+      <ul>${g.reasons.map((x) => `<li>${x}</li>`).join("")}${g.rejections.map((x) => `<li class="sell">${x}</li>`).join("")}</ul>
+    </div>`).join("");
+}
+
+function trades(d) {
+  if (!d.trades.length) { $("trades").innerHTML = '<div class="empty">Sin operaciones cerradas todavía.</div>'; return; }
+  $("trades").innerHTML = `<table><tr><th>Cierre</th><th>Símbolo</th><th>Lado</th><th>Setup</th><th>Entrada</th><th>Salida</th><th>Motivo</th><th>P(éxito)</th><th>R</th><th>P&L</th></tr>${
+    d.trades.map((x) => `<tr><td>${t(x.closed_ts)}</td><td>${x.symbol}</td><td class="${sideCls(x.side)}">${sideTxt(x.side)}</td><td>${x.setup}</td>
+      <td>${n(x.entry)}</td><td>${n(x.exit)}</td><td>${x.exit_reason}</td><td>${pct(x.probability)}</td>
+      <td class="${x.r_multiple >= 0 ? "buy" : "sell"}">${r(x.r_multiple)}</td><td class="${x.pnl >= 0 ? "buy" : "sell"}">${n(x.pnl)}</td></tr>`).join("")}</table>`;
+}
+
+function stats(d) {
+  const s = d.stats;
+  $("stats").innerHTML = `<table>
+    <tr><th>Capital</th><th>Rend.</th><th>Ops</th><th>Acierto</th><th>Esperanza</th><th>PF</th><th>DD máx.</th></tr>
+    <tr><td>${n(s.equity)}</td><td class="${s.return_pct >= 0 ? "buy" : "sell"}">${s.return_pct.toFixed(2)}%</td><td>${s.trades}</td>
+    <td>${pct(s.win_rate)}</td><td>${r(s.expectancy_r)}</td><td>${n(s.profit_factor)}</td><td>${s.max_drawdown_pct.toFixed(2)}%</td></tr></table>`;
+  const cv = $("equity"), ctx = cv.getContext("2d"), w = cv.width = cv.clientWidth * devicePixelRatio, h = cv.height = 120 * devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
+  const pts = [[0, s.equity / (1 + s.return_pct / 100)], ...d.equity_curve];
+  if (pts.length < 2) return;
+  const ys = pts.map((p) => p[1]), lo = Math.min(...ys), hi = Math.max(...ys), span = hi - lo || 1;
+  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--accent"); ctx.lineWidth = 2 * devicePixelRatio;
+  ctx.beginPath();
+  ys.forEach((y, i) => { const x = i / (ys.length - 1) * (w - 8) + 4, yy = h - 6 - (y - lo) / span * (h - 12); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); });
+  ctx.stroke();
+}
+
+function render() {
+  const d = last; if (!d) return;
+  const syms = Object.keys(d.symbols);
+  if (!current || !d.symbols[current]) current = syms[0];
+  $("tabs").innerHTML = syms.map((s) => `<button class="${s === current ? "on" : ""}" onclick="current='${s}';render()">${s}</button>`).join("");
+  $("status").textContent = d.trading_enabled ? "● en vivo" : "calentando con historial…";
+  $("status").style.color = d.trading_enabled ? "var(--buy)" : "var(--warn)";
+  trades(d); stats(d);
+  const s = d.symbols[current]; if (!s) return;
+  kpis(s); footprint(s); position(s); signals(s);
+}
+
+async function poll() {
+  try { last = await (await fetch("/api/state")).json(); render(); }
+  catch (e) { $("status").textContent = "sin conexión con el motor"; $("status").style.color = "var(--sell)"; }
+  setTimeout(poll, 1000);
+}
+poll();
+</script>
+</body>
+</html>

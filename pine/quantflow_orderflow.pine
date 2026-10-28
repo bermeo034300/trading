@@ -1,0 +1,94 @@
+//@version=6
+// QuantFlow · Order Flow (proxy) para TradingView
+// ------------------------------------------------------------------
+// Estima el delta de cada vela a partir de un timeframe inferior, dibuja
+// VWAP con bandas, marca absorciones y divergencias de CVD, y envía una
+// alerta JSON al webhook de QuantFlow (POST /webhook/tradingview).
+// QuantFlow usa la alerta como confirmación ("tradingview" en el modelo);
+// el order flow real (ticks con agresor + libro L2) lo lee directo de Binance.
+//
+// Crear la alerta: Alertas > Condición "QuantFlow" > "Cualquier llamada a la
+// función alert()" > Webhook URL = https://<tu-túnel>/webhook/tradingview
+indicator("QuantFlow · Order Flow (proxy)", shorttitle = "QuantFlow", overlay = false, max_labels_count = 300)
+
+// ---------------- Entradas
+grpW = "Webhook"
+passphrase = input.string("cambia-esto", "Passphrase (igual que en config.yaml)", group = grpW)
+
+grpD = "Delta"
+ltf      = input.timeframe("1", "Timeframe inferior para estimar el delta", group = grpD,
+     tooltip = "Debe ser menor que el del gráfico. Con plan Premium puedes usar segundos (p. ej. 1S).")
+paneMode = input.string("CVD", "Panel inferior", options = ["CVD", "Delta"], group = grpD)
+
+grpS = "Señales"
+absThresh = input.float(0.15, "Absorción: |delta| / volumen mínimo", minval = 0.0, step = 0.05, group = grpS)
+divLen    = input.int(20, "Divergencia CVD: barras", minval = 5, group = grpS)
+showVwap  = input.bool(true, "Mostrar VWAP y bandas", group = grpS)
+
+// ---------------- Delta estimado intrabarra
+// Cada vela del timeframe inferior se asigna a compradores (cierra arriba)
+// o vendedores (cierra abajo). Es una aproximación: TradingView no expone
+// el lado agresor de cada tick vía Pine en todos los planes.
+[ltfO, ltfC, ltfV] = request.security_lower_tf(syminfo.tickerid, ltf, [open, close, volume])
+float buyVol  = 0.0
+float sellVol = 0.0
+for [i, v] in ltfV
+    float o = ltfO.get(i)
+    float c = ltfC.get(i)
+    if c > o
+        buyVol += v
+    else if c < o
+        sellVol += v
+    else
+        buyVol  += v / 2
+        sellVol += v / 2
+if buyVol + sellVol == 0
+    buyVol  := close >= open ? nz(volume) : 0.0
+    sellVol := close <  open ? nz(volume) : 0.0
+
+float delta      = buyVol - sellVol
+float volTot     = buyVol + sellVol
+float deltaRatio = volTot > 0 ? delta / volTot : 0.0
+var float cvd    = 0.0
+cvd += delta
+
+// ---------------- Contexto
+[vwapVal, vwapUp, vwapDn] = ta.vwap(hlc3, timeframe.change("D"), 1.0)
+float closeLoc = high != low ? (close - low) / (high - low) : 0.5
+
+// Absorción: agresión fuerte de un lado pero la vela cierra del otro lado de su rango
+bool absLong  = deltaRatio <= -absThresh and closeLoc >= 0.5 and close < vwapVal
+bool absShort = deltaRatio >=  absThresh and closeLoc <= 0.5 and close > vwapVal
+
+// Divergencia: nuevo extremo de precio sin confirmación del CVD
+float prevHigh  = ta.highest(high, divLen)[1]
+float prevLow   = ta.lowest(low, divLen)[1]
+float prevCvdHi = ta.highest(cvd, divLen)[1]
+float prevCvdLo = ta.lowest(cvd, divLen)[1]
+bool divShort = high >= prevHigh and cvd < prevCvdHi
+bool divLong  = low  <= prevLow  and cvd > prevCvdLo
+
+bool longSig  = barstate.isconfirmed and (absLong or divLong)
+bool shortSig = barstate.isconfirmed and (absShort or divShort)
+
+// ---------------- Dibujo
+plot(paneMode == "CVD" ? cvd : na, "CVD", color.aqua, 2)
+plot(paneMode == "Delta" ? delta : na, "Delta", delta >= 0 ? color.teal : color.red, style = plot.style_columns)
+
+plot(showVwap ? vwapVal : na, "VWAP", color.orange, 2, force_overlay = true)
+plot(showVwap ? vwapUp : na, "VWAP +1σ", color.new(color.orange, 60), force_overlay = true)
+plot(showVwap ? vwapDn : na, "VWAP -1σ", color.new(color.orange, 60), force_overlay = true)
+plotshape(longSig, "Largo", shape.triangleup, location.belowbar, color.teal, size = size.small,
+     text = "QF", force_overlay = true)
+plotshape(shortSig, "Corto", shape.triangledown, location.abovebar, color.red, size = size.small,
+     text = "QF", force_overlay = true)
+
+// ---------------- Alertas JSON para el webhook
+f_msg(string side, string setup) =>
+    '{"passphrase":"' + passphrase + '","symbol":"' + syminfo.ticker + '","side":"' + side +
+     '","setup":"' + setup + '","price":' + str.tostring(close) + ',"timeframe":"' + timeframe.period + '"}'
+
+if longSig
+    alert(f_msg("long", absLong ? "tv_absorcion" : "tv_divergencia"), alert.freq_once_per_bar_close)
+if shortSig
+    alert(f_msg("short", absShort ? "tv_absorcion" : "tv_divergencia"), alert.freq_once_per_bar_close)
