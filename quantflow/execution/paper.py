@@ -63,6 +63,7 @@ class PaperBroker:
         self.journal = journal
         self.calibrator = calibrator
         self.fee = risk_cfg.fee_pct_per_side / 100
+        self.maker_fee = risk_cfg.get("maker_fee_pct_per_side", risk_cfg.fee_pct_per_side) / 100
         self.slip = risk_cfg.slippage_pct / 100
         self.equity = float(risk_cfg.starting_equity)
         self.peak = self.equity
@@ -142,7 +143,9 @@ class PaperBroker:
 
     def _close(self, pos: Position, price: float, ts: int, reason: str) -> None:
         pnl = (price - pos.entry) * pos.side * pos.qty
-        fee = price * pos.qty * self.fee
+        # El objetivo es una orden límite (maker); entrada, stops y salidas a mercado pagan taker.
+        fee_pct = self.maker_fee if reason == "objetivo" else self.fee
+        fee = price * pos.qty * fee_pct
         self.equity += pnl - fee
         fees = pos.fees + fee
         r = (pnl - fees) / (pos.risk * pos.qty) if pos.risk else 0.0

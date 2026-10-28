@@ -39,7 +39,9 @@ integrado con **TradingView**. Opera en **paper trading** (simulado): no envía 
 3. **Calibración bayesiana por setup**: con cada operación cerrada se corrige el sesgo entre lo predicho y
    la tasa real de acierto, con una fuerza previa de 30 operaciones (pocas operaciones no distorsionan).
 4. **Esperanza neta** en múltiplos de R, descontando comisiones y slippage:
-   `EV = p · ganancia_R − (1 − p) · pérdida_R`.
+   `EV = p · ganancia_R − (1 − p) · pérdida_R`. Las salidas al objetivo son órdenes límite
+   (comisión maker); entradas, stops y salidas a mercado pagan taker. Las tasas se configuran en
+   `risk.fee_pct_per_side` y `risk.maker_fee_pct_per_side`.
 5. Se entra solo si probabilidad ≥ 55 %, EV ≥ +0.15R, R:R ≥ 1.5, el stop está entre los límites de ATR y los
    costes no superan el 35 % del riesgo. Si hay varias señales, gana la de mayor EV.
 
@@ -179,6 +181,11 @@ instalado.
   que sean fiables. Usa `backtest --days N --save-calibration` con varias semanas de datos.
 - El backtest no tiene historial del libro L2 ni alertas de TradingView: esos factores valen 0 en él.
 - El slippage es un supuesto fijo; en momentos de volatilidad real puede ser mayor.
+- **No se modela el funding de los perpetuos** (cada 8 h). Si una posición cruza las 00:00, 08:00 o
+  16:00 UTC, el costo o ingreso real puede diferir.
+- Las comisiones por defecto son las estándar de Binance USDⓈ-M Tier 0 (0.02 % maker / 0.05 % taker).
+  Tu nivel VIP o el descuento pagando con BNB pueden reducirlas; ajustá `risk.fee_pct_per_side` y
+  `risk.maker_fee_pct_per_side` a tu cuenta.
 - Binance no está disponible desde algunos países (por ejemplo EE. UU.); en ese caso hay que adaptar
   `quantflow/feeds/binance.py` a otro exchange.
 - Para futuros CME (ES, NQ, GC) el order flow real requiere un feed de pago (Rithmic, CQG, IBKR). El motor

@@ -59,7 +59,8 @@ risk:
   risk_per_trade_pct: 0.5
   max_leverage: 5
   max_daily_loss_pct: 2.0
-  fee_pct_per_side: 0.05       # comisión taker de Binance Futures
+  fee_pct_per_side: 0.05       # taker estándar USDⓈ-M Tier 0 (con BNB: 0.045)
+  maker_fee_pct_per_side: 0.02 # maker estándar; salidas al objetivo límite
   slippage_pct: 0.01
   cooldown_bars: 2
   breakeven_at_r: 1.0          # mueve el stop a entrada al alcanzar +1R (0 = desactivado)

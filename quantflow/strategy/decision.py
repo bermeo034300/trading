@@ -40,12 +40,18 @@ class DecisionEngine:
         p_model = sigmoid(z)
         prob = self.calibrator.adjust(c.setup, p_model)
 
-        cost = c.entry * (2 * self.risk.fee_pct_per_side + 2 * self.risk.slippage_pct) / 100
+        taker_pct = self.risk.fee_pct_per_side
+        maker_pct = self.risk.get("maker_fee_pct_per_side", taker_pct)
+        slip_pct = self.risk.slippage_pct
+        # La ganancia se cierra con límite maker; la pérdida con stop a mercado taker.
+        # Se mantiene slippage de ida y vuelta como margen conservador en ambos casos.
+        cost_win = c.entry * (taker_pct + maker_pct + 2 * slip_pct) / 100
+        cost_loss = c.entry * (2 * taker_pct + 2 * slip_pct) / 100
         reward = abs(c.target - c.entry)
         rr = reward / risk if risk > 0 else 0.0
         if risk > 0:
-            gain_r = (reward - cost) / risk
-            loss_r = (risk + cost) / risk
+            gain_r = (reward - cost_win) / risk
+            loss_r = (risk + cost_loss) / risk
             ev = prob * gain_r - (1 - prob) * loss_r
         else:
             ev = -1.0
@@ -59,8 +65,10 @@ class DecisionEngine:
             rejections.append(f"EV {ev:+.2f}R < {self.p.min_expected_value_r:+.2f}R")
         if rr < self.p.min_rr:
             rejections.append(f"R:R {rr:.2f} < {self.p.min_rr}")
-        if risk > 0 and cost / risk > self.p.max_cost_r:
-            rejections.append(f"comisiones = {cost / risk:.2f}R (máx. {self.p.max_cost_r}R): stop demasiado ajustado")
+        if risk > 0 and cost_loss / risk > self.p.max_cost_r:
+            rejections.append(
+                f"comisiones = {cost_loss / risk:.2f}R (máx. {self.p.max_cost_r}R): stop demasiado ajustado"
+            )
         if risk > self.p.max_stop_atr * ctx.atr:
             rejections.append(f"stop de {risk / ctx.atr:.1f} ATR (máx. {self.p.max_stop_atr})")
         if self.p.require_tradingview and ctx.tv_bias * c.side <= 0:

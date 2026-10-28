@@ -12,6 +12,8 @@ def test_load_default_config_has_expected_values():
     assert cfg.symbols == ["BTCUSDT", "ETHUSDT"]
     assert cfg.bar_seconds == 300
     assert cfg.risk.starting_equity == 10_000
+    assert cfg.risk.fee_pct_per_side == 0.05
+    assert cfg.risk.maker_fee_pct_per_side == 0.02
     assert cfg.server.port == 8000
     assert cfg.footprint.bucket["BTCUSDT"] == 10
 

@@ -134,8 +134,9 @@ def test_absorption_long_is_accepted_with_consistent_math(cfg):
     assert s.target == pytest.approx(1050.0)             # POC: nivel de valor más cercano con R:R suficiente
     risk = s.entry - s.stop
     assert s.rr == pytest.approx((s.target - s.entry) / risk)
-    cost = s.entry * (2 * 0.05 + 2 * 0.01) / 100
-    ev = s.probability * (s.target - s.entry - cost) / risk - (1 - s.probability) * (risk + cost) / risk
+    cost_win = s.entry * (0.05 + 0.02 + 2 * 0.01) / 100
+    cost_loss = s.entry * (2 * 0.05 + 2 * 0.01) / 100
+    ev = s.probability * (s.target - s.entry - cost_win) / risk - (1 - s.probability) * (risk + cost_loss) / risk
     assert s.expected_value_r == pytest.approx(ev)
     assert s.accepted, s.rejections
     assert DecisionEngine.best(sigs) is s
@@ -184,14 +185,17 @@ def test_broker_target_and_stop_r_multiples(cfg):
     b.on_price("BTCUSDT", 111, ts=1)
     win = b.closed[-1]
     assert win["exit_reason"] == "objetivo"
-    fees = (100 + 110) * pos.qty * 0.0005
+    fees = 100 * pos.qty * 0.0005 + 110 * pos.qty * 0.0002   # entrada taker + objetivo maker
+    assert win["fees"] == pytest.approx(fees)
     assert win["r_multiple"] == pytest.approx((10 * pos.qty - fees) / (5 * pos.qty))
 
-    b.open(_signal("short", 100, 105, 90), ts=10**9)
+    short_pos = b.open(_signal("short", 100, 105, 90), ts=10**9)
     b.on_price("BTCUSDT", 105, ts=10**9 + 1)
     loss = b.closed[-1]
     assert loss["exit_reason"] == "stop"
-    assert -1.1 < loss["r_multiple"] < -1.0
+    loss_fees = (100 + 105) * short_pos.qty * 0.0005          # entrada y stop taker
+    assert loss["fees"] == pytest.approx(loss_fees)
+    assert loss["r_multiple"] == pytest.approx((-5 * short_pos.qty - loss_fees) / (5 * short_pos.qty))
     assert e.calibrator.stats["absorcion"]["n"] == 2
 
 
