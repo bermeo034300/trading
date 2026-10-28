@@ -30,16 +30,17 @@ def auto_bucket(price: float) -> float:
 
 def _runs(idxs: list[int], n: int) -> list[tuple[int, int]]:
     """Rachas de índices consecutivos de longitud >= n."""
-    zones = []
-    start = prev = None
+    zones: list[tuple[int, int]] = []
+    start: int | None = None
+    prev: int | None = None
     for i in idxs:
         if prev is not None and i == prev + 1:
             prev = i
             continue
-        if start is not None and prev - start + 1 >= n:
+        if start is not None and prev is not None and prev - start + 1 >= n:
             zones.append((start, prev))
         start = prev = i
-    if start is not None and prev - start + 1 >= n:
+    if start is not None and prev is not None and prev - start + 1 >= n:
         zones.append((start, prev))
     return zones
 
@@ -141,7 +142,7 @@ class FootprintBar:
 
     def to_dict(self, ratio: float = 3.0, min_level_frac: float = 0.5, max_levels: int = 60) -> dict:
         buys, sells = self.imbalances(ratio, min_level_frac)
-        buys, sells = set(buys), set(sells)
+        buy_set, sell_set = set(buys), set(sells)
         poc = self.poc()
         idxs = sorted(self.levels, reverse=True)
         if len(idxs) > max_levels:  # recorta alrededor del cierre
@@ -167,8 +168,8 @@ class FootprintBar:
                     "price": self.price_of(i),
                     "bid": self.levels[i][0],
                     "ask": self.levels[i][1],
-                    "buy_imb": i in buys,
-                    "sell_imb": i in sells,
+                    "buy_imb": i in buy_set,
+                    "sell_imb": i in sell_set,
                     "poc": poc is not None and abs(self.price_of(i) + self.bucket / 2 - poc) < 1e-9,
                 }
                 for i in idxs

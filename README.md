@@ -52,22 +52,47 @@ integrado con **TradingView**. Opera en **paper trading** (simulado): no envía 
 
 ## Instalación
 
-Requiere Python 3.11+ (ya está instalado el 3.12 y el entorno `.venv`).
+Requiere Python 3.11 o superior.
+
+**macOS / Linux**
 
 ```bash
-.venv\Scripts\python.exe -m pip install -r requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
 ```
+
+**Windows (PowerShell)**
+
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+```
+
+Si solo querés ejecutar el programa, sin herramientas de desarrollo:
+
+```bash
+pip install -r requirements.txt
+```
+
+Si instalás el wheel (sin el repo), copiá el `config.yaml` de ejemplo al directorio desde donde vas a
+ejecutar o pasá `--config /ruta/config.yaml`.
+
+`pyproject.toml` declara las dependencias con rangos; `requirements.txt` fija las versiones
+exactas del entorno probado. Al instalar el paquete queda disponible el comando `quantflow`
+dentro del entorno virtual.
 
 ## Uso
 
 **Backtest con ticks reales** (el mismo motor que en vivo):
 
 ```bash
-.venv\Scripts\python.exe -m quantflow backtest --hours 24
+python -m quantflow backtest --hours 24
 ```
 
 ```bash
-.venv\Scripts\python.exe -m quantflow backtest --days 7 --save-calibration
+python -m quantflow backtest --days 7 --save-calibration
 ```
 
 `--hours` descarga por la API REST de Binance; `--days` descarga los archivos diarios de
@@ -78,7 +103,7 @@ operación queda en `reports/`.
 **En vivo (paper trading + panel)**:
 
 ```bash
-.venv\Scripts\python.exe -m quantflow live
+python -m quantflow live
 ```
 
 Abre http://127.0.0.1:8000. Al arrancar descarga 2 horas de ticks para calentar los indicadores
@@ -86,11 +111,26 @@ Abre http://127.0.0.1:8000. Al arrancar descarga 2 horas de ticks para calentar 
 footprint, los niveles clave, las señales con sus razones y la probabilidad, la posición abierta y el
 rendimiento. Todo queda registrado en `data/quantflow.db` (tablas `signals`, `trades` y `calibration`).
 
+También podés usar `quantflow` directamente si instalaste el paquete (`quantflow backtest --days 7`,
+`quantflow live`, etc.).
+
 **Pruebas**:
 
 ```bash
-.venv\Scripts\python.exe -m pytest
+pytest
 ```
+
+## Desarrollo
+
+```bash
+ruff check .        # lint
+mypy                # tipos (quantflow/)
+pytest -q           # tests
+pre-commit install  # hooks opcionales antes de cada commit
+```
+
+El CI de GitHub Actions corre lint, tipos y tests en Python 3.11 y 3.12 para cada push a `main`
+y cada pull request.
 
 ## Integración con TradingView
 
@@ -101,7 +141,8 @@ en el sentido en que TradingView lo permite: **TradingView → QuantFlow** media
    (por ejemplo `BINANCE:BTCUSDT.P`). Dibuja VWAP ± σ y las señales en el precio, y el CVD o el delta en
    un panel inferior.
 2. En la configuración del indicador escribe la misma passphrase que pusiste en
-   `config.yaml → server.webhook_passphrase` (cámbiala, la de ejemplo es pública).
+   `config.yaml → server.webhook_passphrase`. El webhook queda **deshabilitado** (HTTP 503) mientras
+   siga la passphrase de ejemplo `cambia-esto`.
 3. TradingView solo envía webhooks a URLs públicas. Expón el puerto local con un túnel, por ejemplo:
 
    ```bash
@@ -125,6 +166,11 @@ dirección. También puedes enviar alertas de tus propios indicadores o estrateg
 Todo está en `config.yaml`: símbolos, mercado (`futures` o `spot`), duración de barra, tamaño de nivel del
 footprint, umbrales de imbalance, setups activos, pesos del modelo, mínimos de probabilidad y EV, y
 parámetros de riesgo.
+
+`quantflow` busca `config.yaml` en el directorio actual y, si no existe, en la raíz del repo. También podés
+indicar otro archivo con `--config /ruta/config.yaml`. Las rutas relativas del config (`storage.db_path`,
+`storage.cache_dir`, `--out`) se resuelven contra el directorio donde vive el config, no contra el paquete
+instalado.
 
 ## Limitaciones (importante)
 
@@ -152,5 +198,9 @@ quantflow/
   server.py               API, webhook de TradingView y panel
   dashboard/index.html    panel web
 pine/quantflow_orderflow.pine
-tests/
+tests/                    núcleo, server, storage, config, feed y backtest
 ```
+
+## Licencia
+
+MIT. Ver `LICENSE`.

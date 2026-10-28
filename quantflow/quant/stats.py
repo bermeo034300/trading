@@ -24,7 +24,7 @@ def atr(bars: Sequence, period: int = 14) -> float:
         return recent[-1].high - recent[-1].low
     trs = [
         max(cur.high - cur.low, abs(cur.high - prev.close), abs(cur.low - prev.close))
-        for prev, cur in zip(recent, recent[1:])
+        for prev, cur in zip(recent, recent[1:], strict=False)
     ]
     return float(np.mean(trs))
 

@@ -1,8 +1,64 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "quantflow"
 version = "0.1.0"
+description = "Order flow institucional con decisión cuantitativa para paper trading e integración con TradingView"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "nicolas bermeo" }]
+dependencies = [
+    "fastapi>=0.110,<1",
+    "httpx>=0.27,<1",
+    "numpy>=1.26,<3",
+    "pyyaml>=6,<7",
+    "uvicorn>=0.29,<1",
+    "websockets>=12,<18",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build>=1,<2",
+    "httpx2>=2,<3",  # TestClient de Starlette 1.x
+    "mypy>=1.10,<3",
+    "pre-commit>=4,<5",
+    "pytest>=8,<10",
+    "ruff>=0.17,<0.18",
+    "types-PyYAML>=6,<7",
+]
+
+[project.scripts]
+quantflow = "quantflow.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/bermeo034300/trading"
+
+[tool.setuptools.packages.find]
+include = ["quantflow*"]
+
+[tool.setuptools.package-data]
+quantflow = ["dashboard/*.html"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["quantflow", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["quantflow"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["quantflow", "tests"]
+warn_unused_ignores = true

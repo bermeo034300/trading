@@ -20,6 +20,17 @@ from .models import TradingViewAlert
 
 log = logging.getLogger("quantflow.server")
 DASHBOARD = Path(__file__).parent / "dashboard" / "index.html"
+DEFAULT_PASSPHRASE = "cambia-esto"
+
+
+def _configured_passphrase(cfg: Config) -> str:
+    return str(cfg.server.webhook_passphrase or "").strip()
+
+
+def webhook_enabled(cfg: Config) -> bool:
+    """El webhook queda apagado mientras siga la passphrase de ejemplo."""
+    passphrase = _configured_passphrase(cfg)
+    return bool(passphrase) and passphrase != DEFAULT_PASSPHRASE
 
 
 def _clean(o):
@@ -54,12 +65,14 @@ async def run_feed(cfg: Config, engine: Engine, stop: asyncio.Event) -> None:
 def create_app(cfg: Config, engine: Engine | None = None, start_feed: bool = True) -> FastAPI:
     engine = engine or Engine(cfg)
     stop = asyncio.Event()
+    expected_passphrase = _configured_passphrase(cfg)
+    webhook_ready = webhook_enabled(cfg)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         task = asyncio.create_task(run_feed(cfg, engine, stop)) if start_feed else None
-        if cfg.server.webhook_passphrase == "cambia-esto":
-            log.warning("Cambia server.webhook_passphrase en config.yaml antes de exponer el webhook.")
+        if not webhook_ready:
+            log.warning("Webhook de TradingView deshabilitado: cambia server.webhook_passphrase en config.yaml.")
         yield
         stop.set()
         if task:
@@ -80,11 +93,16 @@ def create_app(cfg: Config, engine: Engine | None = None, start_feed: bool = Tru
 
     @app.post("/webhook/tradingview")
     async def tradingview(request: Request):
+        if not webhook_ready:
+            raise HTTPException(503, "Webhook deshabilitado: configura server.webhook_passphrase en config.yaml")
         try:
             data = json.loads(await request.body())
         except ValueError:
-            raise HTTPException(400, "El mensaje de la alerta debe ser JSON válido")
-        if not hmac.compare_digest(str(data.get("passphrase", "")), str(cfg.server.webhook_passphrase)):
+            raise HTTPException(400, "El mensaje de la alerta debe ser JSON válido") from None
+        if not hmac.compare_digest(
+            str(data.get("passphrase", "")).encode("utf-8"),
+            expected_passphrase.encode("utf-8"),
+        ):
             raise HTTPException(401, "passphrase incorrecta")
         side = str(data.get("side", "")).lower()
         if side not in ("long", "short", "flat") or not data.get("symbol"):

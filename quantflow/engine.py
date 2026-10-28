@@ -51,7 +51,7 @@ class Engine:
     def __init__(self, cfg: Config, journal: Journal | None = None):
         self.cfg = cfg
         self.bar_ms = int(cfg.bar_seconds * 1000)
-        self.journal = journal or Journal(resolve_path(cfg.storage.db_path))
+        self.journal = journal or Journal(resolve_path(cfg.storage.db_path, cfg.base_dir))
         self.calibrator = SetupCalibrator(cfg.decision.calibration_prior_strength, self.journal.load_calibration())
         self.decision = DecisionEngine(cfg.decision, cfg.risk, self.calibrator)
         self.broker = PaperBroker(cfg.risk, self.bar_ms, self.journal, self.calibrator)
@@ -99,8 +99,9 @@ class Engine:
 
     # ------------------------------------------------------------- núcleo
     def _close_bar(self, st: SymbolState) -> None:
-        bar, st.bar = st.bar, None
-        if bar.volume <= 0:
+        bar = st.bar
+        st.bar = None
+        if bar is None or bar.volume <= 0:
             return
         st.bars.append(bar)
         st.bar_count += 1

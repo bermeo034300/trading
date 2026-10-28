@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from typing import TypeGuard
 
 from ..orderflow.footprint import FootprintBar
 from ..quant.stats import clip
@@ -80,7 +81,7 @@ def _dispersion(ctx: MarketContext) -> float:
     return ctx.vwap_std if ctx.vwap_std and ctx.vwap_std > 0 else ctx.atr
 
 
-def _valid(x) -> bool:
+def _valid(x: float | None) -> TypeGuard[float]:
     return x is not None and not math.isnan(x)
 
 
@@ -100,10 +101,13 @@ def _reversion_location(ctx: MarketContext, s: int) -> float:
 def _mean_target(ctx: MarketContext, s: int, entry: float, risk: float, min_rr: float) -> tuple[float, str]:
     """Nivel de valor más cercano (POC, VWAP, borde opuesto del área de valor) que ofrezca min_rr."""
     levels = [("POC", ctx.poc), ("VWAP", ctx.vwap), ("VAH" if s > 0 else "VAL", ctx.vah if s > 0 else ctx.val)]
-    opts = [(name, lvl) for name, lvl in levels if _valid(lvl) and (lvl - entry) * s >= min_rr * risk]
+    opts: list[tuple[str, float]] = []
+    for name, level in levels:
+        if _valid(level) and (level - entry) * s >= min_rr * risk:
+            opts.append((name, level))
     if opts:
-        name, lvl = min(opts, key=lambda o: abs(o[1] - entry))
-        return lvl, f"objetivo en {name} ({lvl:,.2f})"
+        name, target = min(opts, key=lambda o: abs(o[1] - entry))
+        return target, f"objetivo en {name} ({target:,.2f})"
     return entry + s * min_rr * risk, f"objetivo a {min_rr:g}R (sin nivel estructural cercano)"
 
 
@@ -169,7 +173,10 @@ def stacked_imbalance(ctx: MarketContext, p) -> list[Candidate]:
             **_common(ctx, s),
         }
         reasons = [
-            f"{len(zones)} zona(s) de imbalances {'compradores' if s > 0 else 'vendedores'} apilados (máx. {longest} niveles)",
+            (
+                f"{len(zones)} zona(s) de imbalances "
+                f"{'compradores' if s > 0 else 'vendedores'} apilados (máx. {longest} niveles)"
+            ),
             f"delta {bar.delta_ratio:+.0%} a favor y precio {'sobre' if s > 0 else 'bajo'} el VWAP ({z:+.1f}σ)",
             f"stop tras la zona de imbalance, objetivo a {p.continuation_rr:g}R",
         ]

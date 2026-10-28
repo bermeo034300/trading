@@ -3,7 +3,7 @@ import random
 
 import pytest
 
-from quantflow.config import load_config
+from quantflow.config import ROOT, load_config
 from quantflow.engine import Engine, normalize_symbol
 from quantflow.models import Signal, Trade, TradingViewAlert
 from quantflow.orderflow import FootprintBar, VolumeProfile, auto_bucket, nice_step
@@ -18,7 +18,7 @@ def T(price, qty, buy, ts=0, sym="BTCUSDT"):
 
 @pytest.fixture
 def cfg():
-    c = load_config()
+    c = load_config(ROOT / "config.yaml")
     c["warmup_bars"] = 5
     c["bar_seconds"] = 60
     return c
@@ -76,9 +76,12 @@ def test_value_area_covers_70pct_and_contains_poc():
 
 def test_profile_rolls_off_old_bars():
     prof = VolumeProfile(lookback=1)
-    a = FootprintBar("X", 0, 1, 1); a.add(T(100, 50, True))
-    b = FootprintBar("X", 1, 2, 1); b.add(T(200, 1, True))
-    prof.add_bar(a); prof.add_bar(b)
+    a = FootprintBar("X", 0, 1, 1)
+    a.add(T(100, 50, True))
+    b = FootprintBar("X", 1, 2, 1)
+    b.add(T(200, 1, True))
+    prof.add_bar(a)
+    prof.add_bar(b)
     assert prof.levels()[0] == 200.5
 
 
@@ -243,7 +246,7 @@ def test_engine_builds_bars_and_runs_end_to_end(cfg):
     st = e.state("BTCUSDT")
     assert len(st.bars) >= 10
     assert all(b.end - b.start == 60_000 for b in st.bars)
-    assert all(a.end <= b.start for a, b in zip(st.bars, list(st.bars)[1:]))
+    assert all(a.end <= b.start for a, b in zip(st.bars, list(st.bars)[1:], strict=False))
     assert st.cvd[-1] == pytest.approx(sum(b.delta for b in st.bars))
     snap = e.snapshot()
     assert snap["symbols"]["BTCUSDT"]["context"]["poc"] is not None

@@ -32,7 +32,7 @@ class VolumeProfile:
         if not self._hist:
             return None, None, None
         hist = self._hist
-        poc = max(hist, key=hist.get)
+        poc = max(hist, key=lambda i: hist[i])
         target = sum(hist.values()) * self.value_area
         mn, mx = min(hist), max(hist)
         lo = hi = poc
@@ -47,4 +47,6 @@ class VolumeProfile:
                 lo -= 1
                 acc += max(dn, 0.0)
         b = self.bucket
+        if b is None:  # no hay barras: levels() ya devolvió arriba
+            return None, None, None
         return round(poc * b + b / 2, 10), round(hi * b + b, 10), round(lo * b, 10)

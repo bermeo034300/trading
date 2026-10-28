@@ -39,10 +39,14 @@ async def run_backtest(cfg: Config, symbols: list[str], hours: float | None = No
     engine = Engine(cfg, journal=journal)
     engine.calibrator.stats = {}  # parte de cero: no mezclar con la calibración en vivo
     market = cfg.exchange.market
-    cache_dir = resolve_path(cfg.storage.cache_dir)
+    cache_dir = resolve_path(cfg.storage.cache_dir, cfg.base_dir)
 
-    sources = [_vision_source(market, s, days, cache_dir) if days else _rest_source(market, s, hours)
-               for s in symbols]
+    if days:
+        sources = [_vision_source(market, s, days, cache_dir) for s in symbols]
+    elif hours is not None:
+        sources = [_rest_source(market, s, hours) for s in symbols]
+    else:
+        raise ValueError("El backtest requiere --hours o --days")
     n = 0
     async for t in _merge(sources):
         engine.on_trade(t)
@@ -60,14 +64,14 @@ async def run_backtest(cfg: Config, symbols: list[str], hours: float | None = No
 
     trades = sorted(engine.broker.closed, key=lambda t: t["closed_ts"])
     if out_csv and trades:
-        path = resolve_path(out_csv)
+        path = resolve_path(out_csv, cfg.base_dir)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(trades[0]))
             w.writeheader()
             w.writerows(trades)
     if save_calibration:
-        live = Journal(resolve_path(cfg.storage.db_path))
+        live = Journal(resolve_path(cfg.storage.db_path, cfg.base_dir))
         live.save_calibration(engine.calibrator.stats)
 
     signals = journal.db.execute("SELECT setup, COUNT(*), SUM(accepted) FROM signals GROUP BY setup").fetchall()

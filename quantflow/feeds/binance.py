@@ -130,12 +130,14 @@ async def download_day(market: str, symbol: str, day: date, cache_dir: Path) -> 
     url = VISION[market].format(s=symbol, d=day.isoformat())
     log.info("Descargando %s", url)
     tmp = path.with_suffix(".part")
-    async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
-        async with client.stream("GET", url) as r:
-            r.raise_for_status()
-            with open(tmp, "wb") as f:
-                async for chunk in r.aiter_bytes(1 << 20):
-                    f.write(chunk)
+    async with (
+        httpx.AsyncClient(timeout=120, follow_redirects=True) as client,
+        client.stream("GET", url) as r,
+    ):
+        r.raise_for_status()
+        with open(tmp, "wb") as f:
+            async for chunk in r.aiter_bytes(1 << 20):
+                f.write(chunk)
     tmp.replace(path)
     return path
 
@@ -143,15 +145,14 @@ async def download_day(market: str, symbol: str, day: date, cache_dir: Path) -> 
 def iter_zip_trades(path: Path, symbol: str) -> Iterator[Trade]:
     """CSV de aggTrades: id, precio, cantidad, primer_id, último_id, timestamp, is_buyer_maker[, best_match].
     Futuros trae cabecera; spot no y desde 2025 usa microsegundos."""
-    with zipfile.ZipFile(path) as zf:
-        with zf.open(zf.namelist()[0]) as raw:
-            for row in csv.reader(io.TextIOWrapper(raw, encoding="utf-8")):
-                if not row or not row[0].isdigit():
-                    continue
-                ts = int(row[5])
-                if ts > 10 ** 14:
-                    ts //= 1000
-                yield Trade(symbol, ts, float(row[1]), float(row[2]), row[6].lower() != "true")
+    with zipfile.ZipFile(path) as zf, zf.open(zf.namelist()[0]) as raw:
+        for row in csv.reader(io.TextIOWrapper(raw, encoding="utf-8")):
+            if not row or not row[0].isdigit():
+                continue
+            ts = int(row[5])
+            if ts > 10 ** 14:
+                ts //= 1000
+            yield Trade(symbol, ts, float(row[1]), float(row[2]), row[6].lower() != "true")
 
 
 def days_back(n: int) -> list[date]:
