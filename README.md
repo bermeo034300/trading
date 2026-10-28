@@ -66,6 +66,11 @@ pip install -e ".[dev]"
 
 **Windows (PowerShell)**
 
+La forma más simple es doble clic en **`iniciar.bat`** (ver [`WINDOWS.md`](WINDOWS.md)). Crea el
+entorno, instala dependencias y abre el panel.
+
+Para desarrollo manual:
+
 ```powershell
 py -3.12 -m venv .venv
 .venv\Scripts\Activate.ps1

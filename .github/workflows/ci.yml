@@ -30,3 +30,13 @@ jobs:
         run: pytest -q
       - name: Empaquetado
         run: python -m build
+
+  windows-launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar lanzador PowerShell
+        shell: pwsh
+        run: |
+          $null = [scriptblock]::Create((Get-Content -Raw ./run_windows.ps1))
+          Write-Host "run_windows.ps1 OK"
