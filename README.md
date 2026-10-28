@@ -134,6 +134,12 @@ pre-commit install  # hooks opcionales antes de cada commit
 El CI de GitHub Actions corre lint, tipos y tests en Python 3.11 y 3.12 para cada push a `main`
 y cada pull request.
 
+## Producción (VPS)
+
+Para correrlo 24/7 sin depender de tu computadora, con HTTPS y webhook estable, seguí
+[`deploy/README.md`](deploy/README.md). Incluye Oracle Cloud Always Free paso a paso, systemd,
+Caddy con basic auth, backup de SQLite y la configuración de TradingView.
+
 ## Integración con TradingView
 
 TradingView no ofrece una API de datos de ticks ni del libro de órdenes, así que la integración funciona

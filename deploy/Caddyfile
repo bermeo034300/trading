@@ -1,0 +1,19 @@
+# Reemplazar quantflow.example.com por tu dominio o por <ip-con-guiones>.sslip.io
+quantflow.example.com {
+    encode zstd gzip
+
+    # TradingView necesita llegar al webhook sin basic auth; la passphrase lo protege.
+    @public path /webhook/*
+    handle @public {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    # Panel y API protegidos con usuario/clave.
+    handle {
+        basic_auth {
+            # Generar con: caddy hash-password --plaintext 'tu-clave'
+            admin $2a$14$REEMPLAZAR_POR_EL_HASH
+        }
+        reverse_proxy 127.0.0.1:8000
+    }
+}

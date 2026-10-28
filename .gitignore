@@ -9,3 +9,5 @@ dist/
 .DS_Store
 data/
 reports/
+backups/
+config.local.yaml

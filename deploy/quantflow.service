@@ -1,0 +1,25 @@
+[Unit]
+Description=QuantFlow paper trading
+Documentation=https://github.com/bermeo034300/trading
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=quantflow
+Group=quantflow
+WorkingDirectory=/opt/quantflow
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/quantflow/.venv/bin/quantflow --config /opt/quantflow/config.local.yaml live
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/quantflow/data
+
+[Install]
+WantedBy=multi-user.target
