@@ -68,3 +68,26 @@ def test_run_backtest_processes_ticks_without_touching_the_network(monkeypatch, 
 def test_run_backtest_requires_hours_or_days():
     with pytest.raises(ValueError):
         asyncio.run(run_backtest(load_config(ROOT / "config.yaml"), ["BTCUSDT"]))
+
+
+def test_vision_source_skips_days_not_yet_published(monkeypatch, tmp_path):
+    from datetime import date
+
+    from quantflow import backtest
+    from quantflow.feeds import binance
+
+    days = [date(2026, 1, 1), date(2026, 1, 2)]
+    monkeypatch.setattr(binance, "days_back", lambda n: days)
+
+    async def fake_download(market, symbol, day, cache_dir):
+        if day == days[-1]:
+            raise binance.DayNotPublished(day.isoformat())
+        return tmp_path / "dia1.zip"
+
+    monkeypatch.setattr(binance, "download_day", fake_download)
+    monkeypatch.setattr(binance, "iter_zip_trades", lambda path, symbol: iter([Trade(symbol, 1, 100.0, 1.0, True)]))
+
+    async def collect():
+        return [t async for t in backtest._vision_source("futures", "BTCUSDT", 2, tmp_path)]
+
+    assert [t.ts for t in asyncio.run(collect())] == [1]

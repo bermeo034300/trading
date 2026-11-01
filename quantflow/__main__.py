@@ -3,6 +3,7 @@
   python -m quantflow live                      # panel + mercado en vivo (paper trading)
   python -m quantflow backtest --hours 6        # backtest con ticks reales recientes (REST)
   python -m quantflow backtest --days 3         # backtest con archivos diarios de data.binance.vision
+  python -m quantflow research --days 60        # validación estadística (ajuste vs. prueba)
 """
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ import argparse
 import asyncio
 import logging
 import sys
+from pathlib import Path
 
 from .config import load_config
 
@@ -48,6 +50,30 @@ def print_report(result: dict) -> None:
         print("Aviso: menos de 30 operaciones no es una muestra estadísticamente fiable.")
 
 
+def run_research(args, cfg) -> None:
+    import json
+
+    from . import research
+    from .config import _find_default_config, resolve_path
+
+    out_dir = resolve_path(args.out_dir, cfg.base_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if args.dataset:
+        rows = research.load_dataset(Path(args.dataset))
+    else:
+        config_path = args.config or str(_find_default_config())
+        dataset = out_dir / f"senales_{args.days}d.csv"
+        rows = research.collect(config_path, args.symbols or list(cfg.symbols), args.days, dataset)
+        print(f"Dataset de señales: {dataset}")
+    result = research.analyze(rows, args.train_frac, cfg.decision.min_expected_value_r)
+    report = research.render_report(result, cfg.decision.min_expected_value_r)
+    (out_dir / "validacion.md").write_text(report, encoding="utf-8")
+    (out_dir / "validacion.json").write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str),
+                                             encoding="utf-8")
+    print(report)
+    print(f"\nInforme: {out_dir / 'validacion.md'}")
+
+
 def main(argv: list[str] | None = None) -> None:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -68,6 +94,13 @@ def main(argv: list[str] | None = None) -> None:
     bt.add_argument("--save-calibration", action="store_true",
                     help="guarda la calibración aprendida para usarla en vivo")
 
+    rs = sub.add_parser("research", help="valida estadísticamente la ventaja con datos de ajuste y de prueba")
+    rs.add_argument("--symbols", nargs="+")
+    rs.add_argument("--days", type=int, default=30, help="últimos N días completos (por defecto 30)")
+    rs.add_argument("--train-frac", type=float, default=0.6, help="fracción inicial usada para ajustar")
+    rs.add_argument("--dataset", help="reanaliza un CSV de señales ya generado, sin volver a procesar ticks")
+    rs.add_argument("--out-dir", default="reports")
+
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s",
                         datefmt="%H:%M:%S")
@@ -82,6 +115,10 @@ def main(argv: list[str] | None = None) -> None:
         print_report(result)
         if result["trades"]:
             print(f"Detalle de operaciones: {args.out}")
+        return
+
+    if args.cmd == "research":
+        run_research(args, cfg)
         return
 
     import uvicorn

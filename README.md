@@ -107,6 +107,25 @@ data.binance.vision (más rápido para periodos largos; se guardan en `data/cach
 guarda lo aprendido para que el modo en vivo empiece con probabilidades calibradas. El detalle de cada
 operación queda en `reports/`.
 
+**Validación estadística de la ventaja**:
+
+```bash
+python -m quantflow research --days 60
+```
+
+Un backtest da pocas operaciones (una posición a la vez), así que no basta para saber si hay ventaja.
+`research` registra todas las señales evaluadas, aceptadas o no, y simula el resultado de cada una con
+los ticks siguientes (stop, objetivo o tiempo, con costes). Luego separa el periodo en el tiempo:
+
+- **ajuste** (primer 60 %): se re-ajusta una regresión logística con los factores;
+- **prueba** (último 40 %): se mide, sin tocar nada, lo aprendido en ajuste.
+
+El informe (`reports/validacion.md`) muestra, por setup y en ambos periodos: tasa de acierto, R medio
+con intervalo de confianza del 95 %, prueba t y valor p. También muestra si la probabilidad del modelo
+actual se cumple en la práctica, el AUC del modelo re-ajustado y su resultado semana a semana. Las
+señales que se solapan con otra abierta del mismo setup no cuentan, para no inflar la muestra. Con
+`--dataset reports/senales_60d.csv` se re-analiza sin volver a procesar los ticks.
+
 **En vivo (paper trading + panel)**:
 
 ```bash
@@ -186,6 +205,11 @@ indicar otro archivo con `--config /ruta/config.yaml`. Las rutas relativas del c
 instalado.
 
 ## Limitaciones (importante)
+
+- **Validado sin ventaja.** Con 60 días de datos reales (septiembre-octubre 2026), en marcos de 5 min,
+  15 min y 1 hora, los setups no predicen el precio y la regla actual pierde dinero. Úsalo como
+  herramienta visual de order flow, no para decidir operaciones. Detalle en
+  [docs/validacion](docs/validacion/README.md).
 
 - **Los pesos del modelo son supuestos razonables, no están optimizados.** La calibración bayesiana corrige
   las probabilidades con los resultados, pero hace falta una muestra grande (cientos de operaciones) para

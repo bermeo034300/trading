@@ -116,6 +116,8 @@ class Engine:
         for s in signals:
             self.journal.log_signal(s)
             st.signals.append(s)
+        if signals:
+            self._emit("signals", signals)
         best = self.decision.best(signals)
         if best and self.broker.open(best, bar.end):
             self._emit("entry", best)

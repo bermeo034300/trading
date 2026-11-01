@@ -15,7 +15,7 @@ import json
 import logging
 import zipfile
 from collections.abc import AsyncIterator, Callable, Iterator
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -38,6 +38,10 @@ VISION = {
     "spot": "https://data.binance.vision/data/spot/daily/aggTrades/{s}/{s}-aggTrades-{d}.zip",
 }
 HOUR_MS = 3_600_000
+
+
+class DayNotPublished(Exception):
+    """Binance aún no publicó el archivo de ese día (suele tardar varias horas tras el cierre UTC)."""
 
 
 def _parse_agg(symbol: str, d: dict) -> Trade:
@@ -134,6 +138,8 @@ async def download_day(market: str, symbol: str, day: date, cache_dir: Path) -> 
         httpx.AsyncClient(timeout=120, follow_redirects=True) as client,
         client.stream("GET", url) as r,
     ):
+        if r.status_code == 404:
+            raise DayNotPublished(f"{symbol} {day.isoformat()}")
         r.raise_for_status()
         with open(tmp, "wb") as f:
             async for chunk in r.aiter_bytes(1 << 20):
@@ -157,5 +163,5 @@ def iter_zip_trades(path: Path, symbol: str) -> Iterator[Trade]:
 
 def days_back(n: int) -> list[date]:
     """Los últimos n días completos (UTC); los archivos del día en curso aún no existen."""
-    today = date.today()
+    today = datetime.now(UTC).date()
     return [today - timedelta(days=i) for i in range(n, 0, -1)]

@@ -28,7 +28,11 @@ async def _rest_source(market: str, symbol: str, hours: float) -> AsyncIterator[
 
 async def _vision_source(market: str, symbol: str, days: int, cache_dir) -> AsyncIterator[Trade]:
     for day in binance.days_back(days):
-        path = await binance.download_day(market, symbol, day, cache_dir)
+        try:
+            path = await binance.download_day(market, symbol, day, cache_dir)
+        except binance.DayNotPublished:
+            log.warning("%s %s: Binance aún no publicó ese día, se omite", symbol, day.isoformat())
+            continue
         for t in binance.iter_zip_trades(path, symbol):
             yield t
 

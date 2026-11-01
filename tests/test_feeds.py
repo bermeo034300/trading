@@ -1,6 +1,6 @@
 import asyncio
 import zipfile
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from quantflow.feeds.binance import _parse_agg, _parse_levels, days_back, download_day, iter_zip_trades
 
@@ -52,7 +52,7 @@ def test_days_back_returns_complete_previous_days():
     days = days_back(3)
     assert len(days) == 3
     assert days == sorted(days)
-    assert days[-1] == date.today() - timedelta(days=1)
+    assert days[-1] == datetime.now(UTC).date() - timedelta(days=1)
 
 
 def test_download_day_uses_cache_without_network(tmp_path):
